@@ -93,6 +93,7 @@
 	// The matching `RENOVATE_ALLOWED_COMMANDS` regex allowlist in
 	// `.github/workflows/renovate.yml` is required — by default Renovate
 	// refuses to execute any postUpgradeTask command.
+	postUpgradeTasks: {
 		// `installTools` (Renovate 41+) declaratively materializes tools via
 		// containerbase BEFORE the postUpgradeTask commands run, ensuring they
 		// are on PATH for the command's shell.
