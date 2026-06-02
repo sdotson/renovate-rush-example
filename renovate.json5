@@ -20,7 +20,7 @@
 	// Our rush.json allows ">=18.20.3 <19.0.0 || >=20.14.0 <21.0.0";
 	// "^20" picks the latest Node 20.x within that range.
 	constraints: {
-		node: '^20',
+		node: '^24.16.0',
 	},
 
 
