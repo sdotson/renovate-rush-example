@@ -11,18 +11,6 @@
 	rangeStrategy: 'bump',
 	rebaseWhen: 'conflicted',
 
-	// Constrain the Node version that containerbase installs for
-	// postUpgradeTasks (referenced from `installTools` below) to satisfy
-	// rush.json's `nodeSupportedVersionRange`. Without this, containerbase
-	// installs latest Node (currently 24.x), which Rush rejects with:
-	//   ERROR: Your dev environment is running Node.js version vXX which
-	//   does not meet the requirements for building this repository.
-	// Our rush.json allows ">=18.20.3 <19.0.0 || >=20.14.0 <21.0.0";
-	// "^20" picks the latest Node 20.x within that range.
-	constraints: {
-		node: '^20',
-	},
-
 
 	// Sandbox-only: always recreate PRs we've previously closed. Production
 	// configs should leave this at the default 'auto', which respects user
@@ -94,34 +82,37 @@
 	// `.github/workflows/renovate.yml` is required — by default Renovate
 	// refuses to execute any postUpgradeTask command.
 	postUpgradeTasks: {
-		// `installTools` (Renovate 41+) declaratively materializes tools via
-		// containerbase BEFORE the postUpgradeTask commands run, ensuring they
-		// are on PATH for the command's shell.
+		// Three commands, run in sequence in the same shell environment:
 		//
-		// We need `npm` because Rush's bootstrap script (`install-run-rush.js`)
-		// does `command -v npm` and aborts immediately if it can't find npm —
-		// and Renovate's Docker image ships Node but not the npm CLI by
-		// default (Renovate's own npm manager uses pnpm internally and never
-		// shells out to npm).
+		// 1. `install-tool node 20.14.0` — installs a Rush-compatible Node
+		//    version via containerbase. The Renovate `installTools`
+		//    declarative config (Renovate 41+) doesn't honor a node version
+		//    constraint (verified via Renovate discussion #26387 —
+		//    `constraints.node` and `force.constraints.node` are both
+		//    ignored by installTools); the maintainer's recommended pattern
+		//    is to invoke `install-tool node X.Y.Z` directly. Without this,
+		//    containerbase defaults to latest Node (24.x), which Rush
+		//    rejects (rush.json's `nodeSupportedVersionRange` allows only
+		//    Node 18 or 20). 20.14.0 is the bottom of the supported 20.x
+		//    range — bump as needed if rush.json changes.
 		//
-		// `node` must be listed too even though the Renovate container
-		// already has Node on PATH — containerbase only knows about tools it
-		// installed itself, and `install-tool npm` requires its parent
-		// (`node`) to be containerbase-registered. Without listing node, the
-		// install-tool fails with: "parent tool not installed: tool: npm,
-		// parent: node".
+		// 2. `install-tool npm` — materializes the npm CLI. Renovate's
+		//    Docker image ships Node but not the npm CLI by default
+		//    (Renovate's own npm manager uses pnpm internally and never
+		//    shells out to npm). Rush's bootstrap script does `command -v
+		//    npm` and aborts immediately if it can't find npm. `npm`
+		//    requires `node` to be containerbase-installed first, which
+		//    step 1 above provides.
 		//
-		// The version for `node` is set via the top-level `constraints` block
-		// below — see comment there.
-		installTools: {
-			node: {},
-			npm: {},
-		},
-		// `node common/scripts/install-run-rush.js update` is the Rush bootstrap:
-		// downloads the pinned Rush version, then runs `rush update` to
-		// regenerate `common/config/rush/pnpm-lock.yaml` based on the current
-		// package.json contents.
-		commands: ['node common/scripts/install-run-rush.js update'],
+		// 3. `node common/scripts/install-run-rush.js update` — the Rush
+		//    bootstrap: downloads the pinned Rush version, then runs
+		//    `rush update` to regenerate `common/config/rush/pnpm-lock.yaml`
+		//    based on the current package.json contents.
+		commands: [
+			'install-tool node 20.14.0',
+			'install-tool npm',
+			'node common/scripts/install-run-rush.js update',
+		],
 		fileFilters: ['common/config/rush/pnpm-lock.yaml', 'common/config/rush/repo-state.json'],
 		executionMode: 'branch',
 	},
