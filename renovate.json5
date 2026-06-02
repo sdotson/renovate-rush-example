@@ -81,26 +81,21 @@
 	// `.github/workflows/renovate.yml` is required — by default Renovate
 	// refuses to execute any postUpgradeTask command.
 	postUpgradeTasks: {
-		// Two commands, executed in sequence in the same shell environment:
-		//
-		//   1. `install-tool npm` — containerbase CLI that materializes the npm
-		//      binary on the runner. Required because the Renovate Docker image
-		//      ships Node but does NOT have npm in PATH by default; Rush's
-		//      bootstrap script does `command -v npm` and aborts immediately
-		//      if it can't find it. (Renovate's npm manager uses pnpm
-		//      internally and never shells out to npm CLI, so the image was
-		//      built without it.) In Renovate 41+, `installTools: { npm: {} }`
-		//      under postUpgradeTasks does this declaratively; on earlier
-		//      versions we invoke the containerbase CLI directly.
-		//
-		//   2. `node common/scripts/install-run-rush.js update` — the Rush
-		//      bootstrap: downloads the pinned Rush version, then runs
-		//      `rush update` to regenerate `common/config/rush/pnpm-lock.yaml`
-		//      based on current package.json contents.
-		commands: [
-			'install-tool npm',
-			'node common/scripts/install-run-rush.js update',
-		],
+		// `installTools` (Renovate 41+) declaratively materializes tools via
+		// containerbase BEFORE the postUpgradeTask commands run, ensuring they
+		// are on PATH for the command's shell. We need `npm` because Rush's
+		// bootstrap script (`install-run-rush.js`) does `command -v npm` and
+		// aborts immediately if it can't find npm — and Renovate's Docker
+		// image ships Node but not the npm CLI by default (Renovate's own
+		// npm manager uses pnpm internally and never shells out to npm).
+		installTools: {
+			npm: {},
+		},
+		// `node common/scripts/install-run-rush.js update` is the Rush bootstrap:
+		// downloads the pinned Rush version, then runs `rush update` to
+		// regenerate `common/config/rush/pnpm-lock.yaml` based on the current
+		// package.json contents.
+		commands: ['node common/scripts/install-run-rush.js update'],
 		fileFilters: ['common/config/rush/pnpm-lock.yaml', 'common/config/rush/repo-state.json'],
 		executionMode: 'branch',
 	},
