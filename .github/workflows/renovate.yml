@@ -62,7 +62,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Run Renovate
-        uses: renovatebot/github-action@v41.0.0
+        uses: renovatebot/github-action@v46.1.14
         env:
           LOG_LEVEL: ${{ inputs.logLevel || 'debug' }}
           # Tells Renovate to materialize tools on demand from containerbase
