@@ -10,14 +10,21 @@
 
 	rangeStrategy: 'bump',
 	rebaseWhen: 'conflicted',
+
 	// Sandbox-only: always recreate PRs we've previously closed. Production
 	// configs should leave this at the default 'auto', which respects user
 	// intent (closing a Renovate PR signals "rejected, don't recreate"). Here
 	// we want fast iteration, so closing-and-re-triggering should always
 	// produce a fresh PR.
 	recreateWhen: 'always',
-	prHourlyLimit: 4,
-	prConcurrentLimit: 5,
+	// Sandbox-only: disable rate limits so iteration isn't gated by Renovate's
+	// own safety knobs. Counterintuitively, prHourlyLimit counts closed PRs
+	// too within the last hour, so close-and-retrigger cycles burn through
+	// the budget. Production configs SHOULD set these to reasonable values
+	// (e.g. prHourlyLimit: 2-4, prConcurrentLimit: 5-10) to throttle PR
+	// floods.
+	prHourlyLimit: 0,
+	prConcurrentLimit: 0,
 	labels: ['dependencies'],
 	dependencyDashboardTitle: 'Renovate Dependency Dashboard',
 	packageRules: [
