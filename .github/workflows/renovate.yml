@@ -1,0 +1,86 @@
+name: Renovate
+
+# Reference workflow for self-hosted Renovate against a Rush.js monorepo.
+#
+# Renovate has no native Rush manager (renovatebot/renovate#3681 — open since
+# 2019), so by default it modifies package.json files but doesn't know to
+# regenerate the consolidated Rush lockfile at common/config/rush/pnpm-lock.yaml.
+# The result is PRs that fail CI at Rush's consistency check before any code
+# runs.
+#
+# The fix is Renovate's general-purpose `postUpgradeTasks` feature, invoking
+# the Rush bootstrap script `common/scripts/install-run-rush.js`. See
+# `renovate.json5` in this repo for the config side, and the comments below
+# for the workflow-side pieces that make it work.
+
+on:
+  schedule:
+    # Hourly, since this is a sandbox; in production you would typically gate
+    # routine PRs to a quieter cadence via renovate.json5's `schedule`.
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: false
+        default: 'debug'
+        type: choice
+        options:
+          - info
+          - debug
+      dryRun:
+        description: 'Dry run mode (null = real PRs; full/extract/lookup are diagnostic)'
+        required: false
+        default: 'null'
+        type: choice
+        options:
+          - 'null'
+          - 'extract'
+          - 'lookup'
+          - 'full'
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@v41.0.0
+        env:
+          LOG_LEVEL: ${{ inputs.logLevel || 'debug' }}
+          # `renovatebot/github-action` only forwards `RENOVATE_*`-prefixed env
+          # vars (plus LOG_LEVEL) into Renovate's Docker container — a bare
+          # GITHUB_REPOSITORY would never reach it. Use ${{ github.repository }}
+          # so this workflow is self-aware if copied to other repos.
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          # Renovate parses the string "null" as no dry-run; other values
+          # (extract/lookup/full) are valid enum members of the `dryRun`
+          # config option.
+          RENOVATE_DRY_RUN: ${{ inputs.dryRun || 'null' }}
+          # Self-hosted security gate: Renovate refuses to run any
+          # postUpgradeTask command unless it matches this regex allowlist.
+          # The pattern below permits ONLY the exact Rush bootstrap
+          # invocation used by `postUpgradeTasks` in renovate.json5.
+          # (This option was formerly named `allowedPostUpgradeCommands`;
+          # renamed to `allowedCommands` in Renovate 39.131.0.)
+          RENOVATE_ALLOWED_COMMANDS: '["^node common/scripts/install-run-rush\.js update$"]'
+        with:
+          configurationFile: renovate.json5
+          token: ${{ steps.app-token.outputs.token }}

@@ -1,0 +1,75 @@
+{
+	$schema: 'https://docs.renovatebot.com/renovate-schema.json',
+	extends: ['config:recommended', ':dependencyDashboard', ':semanticCommitsDisabled'],
+
+	// Sandbox tuning: in production you'd typically want a release-age delay
+	// (e.g. '14 days') to avoid picking up freshly-published versions, and a
+	// schedule like 'before 6am on monday' to batch routine PRs. Here we run
+	// hot so a triggered Renovate run can actually do something visible.
+	minimumReleaseAge: '0 days',
+
+	rangeStrategy: 'bump',
+	rebaseWhen: 'conflicted',
+	prHourlyLimit: 4,
+	prConcurrentLimit: 5,
+	labels: ['dependencies'],
+	dependencyDashboardTitle: 'Renovate Dependency Dashboard',
+	packageRules: [
+		{
+			matchUpdateTypes: ['minor', 'patch'],
+			matchDepTypes: ['devDependencies'],
+			groupName: 'dev dependencies (minor + patch)',
+		},
+		{
+			matchUpdateTypes: ['minor', 'patch'],
+			matchDepTypes: ['dependencies'],
+			groupName: 'prod dependencies (minor + patch)',
+		},
+		{
+			// Rush workspace deps are local; never bump these.
+			matchCurrentValue: '/^workspace:/',
+			enabled: false,
+		},
+	],
+	lockFileMaintenance: {
+		enabled: true,
+		schedule: ['before 6am on monday'],
+	},
+	vulnerabilityAlerts: {
+		labels: ['security'],
+		minimumReleaseAge: '0 days',
+		schedule: ['at any time'],
+	},
+
+	// THE MAIN POINT OF THIS REPO.
+	//
+	// Renovate has no native Rush manager (renovatebot/renovate#3681).
+	// Without this block, Renovate's npm manager modifies package.json files
+	// but doesn't know about the Rush-consolidated lockfile at
+	// `common/config/rush/pnpm-lock.yaml` (it expects per-package lockfiles
+	// adjacent to each package.json). PRs land with package.json bumps but
+	// no lockfile updates → every CI build fails at Rush's consistency check.
+	//
+	// `node common/scripts/install-run-rush.js update` is the Rush bootstrap
+	// invocation: install-run-rush.js downloads the pinned Rush version into
+	// common/temp/ and then runs `rush update`, which regenerates the
+	// consolidated lockfile based on the current package.json contents.
+	//
+	// `executionMode: 'branch'` runs the command once per branch (not once
+	// per individual dependency update), so a single regen handles the
+	// whole batch.
+	//
+	// `fileFilters` is the allowlist of files Renovate will include in the
+	// commit from post-task changes. The transient build state in
+	// `common/temp/` is gitignored by Rush convention, so it doesn't need
+	// explicit exclusion.
+	//
+	// The matching `RENOVATE_ALLOWED_COMMANDS` regex allowlist in
+	// `.github/workflows/renovate.yml` is required — by default Renovate
+	// refuses to execute any postUpgradeTask command.
+	postUpgradeTasks: {
+		commands: ['node common/scripts/install-run-rush.js update'],
+		fileFilters: ['common/config/rush/pnpm-lock.yaml', 'common/config/rush/repo-state.json'],
+		executionMode: 'branch',
+	},
+}
