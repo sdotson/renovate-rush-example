@@ -11,6 +11,19 @@
 	rangeStrategy: 'bump',
 	rebaseWhen: 'conflicted',
 
+	// Constrain the Node version that containerbase installs for
+	// postUpgradeTasks (referenced from `installTools` below) to satisfy
+	// rush.json's `nodeSupportedVersionRange`. Without this, containerbase
+	// installs latest Node (currently 24.x), which Rush rejects with:
+	//   ERROR: Your dev environment is running Node.js version vXX which
+	//   does not meet the requirements for building this repository.
+	// Our rush.json allows ">=18.20.3 <19.0.0 || >=20.14.0 <21.0.0";
+	// "^20" picks the latest Node 20.x within that range.
+	constraints: {
+		node: '^20',
+	},
+
+
 	// Sandbox-only: always recreate PRs we've previously closed. Production
 	// configs should leave this at the default 'auto', which respects user
 	// intent (closing a Renovate PR signals "rejected, don't recreate"). Here
@@ -80,7 +93,6 @@
 	// The matching `RENOVATE_ALLOWED_COMMANDS` regex allowlist in
 	// `.github/workflows/renovate.yml` is required — by default Renovate
 	// refuses to execute any postUpgradeTask command.
-	postUpgradeTasks: {
 		// `installTools` (Renovate 41+) declaratively materializes tools via
 		// containerbase BEFORE the postUpgradeTask commands run, ensuring they
 		// are on PATH for the command's shell.
@@ -98,14 +110,10 @@
 		// install-tool fails with: "parent tool not installed: tool: npm,
 		// parent: node".
 		//
-		// The Node version must satisfy rush.json's
-		// nodeSupportedVersionRange — otherwise `install-run-rush.js` will
-		// abort with "does not meet the requirements for building this
-		// repository". Adjust this constraint if your rush.json's range
-		// changes. Our rush.json allows ">=18.20.3 <19.0.0 || >=20.14.0
-		// <21.0.0"; we pin to Node 20 here.
+		// The version for `node` is set via the top-level `constraints` block
+		// below — see comment there.
 		installTools: {
-			node: { constraint: '20' },
+			node: {},
 			npm: {},
 		},
 		// `node common/scripts/install-run-rush.js update` is the Rush bootstrap:
