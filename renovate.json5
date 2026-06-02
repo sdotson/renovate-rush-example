@@ -83,12 +83,22 @@
 	postUpgradeTasks: {
 		// `installTools` (Renovate 41+) declaratively materializes tools via
 		// containerbase BEFORE the postUpgradeTask commands run, ensuring they
-		// are on PATH for the command's shell. We need `npm` because Rush's
-		// bootstrap script (`install-run-rush.js`) does `command -v npm` and
-		// aborts immediately if it can't find npm — and Renovate's Docker
-		// image ships Node but not the npm CLI by default (Renovate's own
-		// npm manager uses pnpm internally and never shells out to npm).
+		// are on PATH for the command's shell.
+		//
+		// We need `npm` because Rush's bootstrap script (`install-run-rush.js`)
+		// does `command -v npm` and aborts immediately if it can't find npm —
+		// and Renovate's Docker image ships Node but not the npm CLI by
+		// default (Renovate's own npm manager uses pnpm internally and never
+		// shells out to npm).
+		//
+		// `node` must be listed too even though the Renovate container
+		// already has Node on PATH — containerbase only knows about tools it
+		// installed itself, and `install-tool npm` requires its parent
+		// (`node`) to be containerbase-registered. Without listing node, the
+		// install-tool fails with: "parent tool not installed: tool: npm,
+		// parent: node".
 		installTools: {
+			node: {},
 			npm: {},
 		},
 		// `node common/scripts/install-run-rush.js update` is the Rush bootstrap:
