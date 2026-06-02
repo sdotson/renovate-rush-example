@@ -92,7 +92,7 @@ jobs:
           #   3. node common/scripts/install-run-rush.js update — Rush
           # (This option was formerly named `allowedPostUpgradeCommands`;
           # renamed to `allowedCommands` in Renovate 39.131.0.)
-          RENOVATE_ALLOWED_COMMANDS: '["^install-tool node [0-9.]+$", "^install-tool npm$", "^node common/scripts/install-run-rush\.js update$"]'
+          RENOVATE_ALLOWED_COMMANDS: '["^install-tool node [0-9.]+$", "^install-tool npm$", "^node common/scripts/install-run-rush\.js update --bypass-policy$"]'
         with:
           configurationFile: renovate.json5
           token: ${{ steps.app-token.outputs.token }}

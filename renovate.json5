@@ -104,14 +104,26 @@
 		//    requires `node` to be containerbase-installed first, which
 		//    step 1 above provides.
 		//
-		// 3. `node common/scripts/install-run-rush.js update` — the Rush
-		//    bootstrap: downloads the pinned Rush version, then runs
-		//    `rush update` to regenerate `common/config/rush/pnpm-lock.yaml`
-		//    based on the current package.json contents.
+		// 3. `node common/scripts/install-run-rush.js update --bypass-policy`
+		//    — the Rush bootstrap. Downloads the pinned Rush version, then
+		//    runs `rush update` to regenerate
+		//    `common/config/rush/pnpm-lock.yaml` from current package.json
+		//    contents.
+		//
+		//    The `--bypass-policy` flag skips Rush's git-author email check
+		//    (`gitPolicy.allowedEmailRegExps` in rush.json). That policy
+		//    exists to catch humans with unprofessional commit emails, but
+		//    bot tools doing automated lockfile maintenance can hit
+		//    false-positives — the first Rush invocation in a run does
+		//    policy validation before Renovate sets its bot identity, so
+		//    the email check sees an unexpected value and aborts. Without
+		//    --bypass-policy, the very first branch alphabetically
+		//    processed will fail with: "Aborting, so you can go fix your
+		//    settings. (Or use '--bypass-policy' to skip.)"
 		commands: [
 			'install-tool node 20.14.0',
 			'install-tool npm',
-			'node common/scripts/install-run-rush.js update',
+			'node common/scripts/install-run-rush.js update --bypass-policy',
 		],
 		fileFilters: ['common/config/rush/pnpm-lock.yaml', 'common/config/rush/repo-state.json'],
 		executionMode: 'branch',
