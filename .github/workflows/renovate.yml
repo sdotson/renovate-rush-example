@@ -86,11 +86,15 @@ jobs:
           RENOVATE_DRY_RUN: ${{ inputs.dryRun || 'null' }}
           # Self-hosted security gate: Renovate refuses to run any
           # postUpgradeTask command unless it matches this regex allowlist.
-          # The pattern below permits ONLY the exact Rush bootstrap
-          # invocation used by `postUpgradeTasks` in renovate.json5.
+          # We have two commands in sequence (see renovate.json5):
+          #   1. `install-tool npm` — containerbase CLI to materialize npm
+          #      so it's in PATH for the next step (Renovate's image ships
+          #      Node but not the npm CLI by default).
+          #   2. `node common/scripts/install-run-rush.js update` — Rush
+          #      bootstrap that regenerates the consolidated lockfile.
           # (This option was formerly named `allowedPostUpgradeCommands`;
           # renamed to `allowedCommands` in Renovate 39.131.0.)
-          RENOVATE_ALLOWED_COMMANDS: '["^node common/scripts/install-run-rush\.js update$"]'
+          RENOVATE_ALLOWED_COMMANDS: '["^install-tool npm$", "^node common/scripts/install-run-rush\.js update$"]'
         with:
           configurationFile: renovate.json5
           token: ${{ steps.app-token.outputs.token }}
