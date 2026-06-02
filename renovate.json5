@@ -44,6 +44,24 @@
 			matchCurrentValue: '/^workspace:/',
 			enabled: false,
 		},
+		{
+			// Run the Rush lockfile-regen post-upgrade task ONLY for npm
+			// manager updates. Workflow-file changes (github-actions
+			// manager), Dockerfiles, etc. don't affect Rush deps, so
+			// running rush update on those PRs is pure waste (~30-60s
+			// per non-npm PR for container setup that produces no
+			// lockfile diff).
+			matchManagers: ['npm'],
+			postUpgradeTasks: {
+				commands: [
+					'install-tool node 20.14.0',
+					'install-tool npm',
+					'node common/scripts/install-run-rush.js update --bypass-policy',
+				],
+				fileFilters: ['common/config/rush/pnpm-lock.yaml', 'common/config/rush/repo-state.json'],
+				executionMode: 'branch',
+			},
+		},
 	],
 	lockFileMaintenance: {
 		enabled: true,
@@ -55,77 +73,58 @@
 		schedule: ['at any time'],
 	},
 
+	// The Rush lockfile-regen postUpgradeTask lives inside packageRules
+	// (scoped to `matchManagers: ['npm']`) — see that block above. We do
+	// this so `rush update` only runs for PRs that actually change
+	// package.json files; workflow-file bumps, Dockerfile bumps, etc.
+	// don't trigger it. The detailed rationale for each command in the
+	// task lives in this comment block:
+	//
 	// THE MAIN POINT OF THIS REPO.
 	//
 	// Renovate has no native Rush manager (renovatebot/renovate#3681).
-	// Without this block, Renovate's npm manager modifies package.json files
-	// but doesn't know about the Rush-consolidated lockfile at
-	// `common/config/rush/pnpm-lock.yaml` (it expects per-package lockfiles
-	// adjacent to each package.json). PRs land with package.json bumps but
-	// no lockfile updates → every CI build fails at Rush's consistency check.
+	// Without the postUpgradeTask, Renovate's npm manager modifies
+	// package.json files but doesn't know about the Rush-consolidated
+	// lockfile at `common/config/rush/pnpm-lock.yaml` (it expects
+	// per-package lockfiles adjacent to each package.json). PRs land
+	// with package.json bumps but no lockfile updates → every CI build
+	// fails at Rush's consistency check.
 	//
-	// `node common/scripts/install-run-rush.js update` is the Rush bootstrap
-	// invocation: install-run-rush.js downloads the pinned Rush version into
-	// common/temp/ and then runs `rush update`, which regenerates the
-	// consolidated lockfile based on the current package.json contents.
+	// Three commands run in sequence in the same shell environment:
 	//
-	// `executionMode: 'branch'` runs the command once per branch (not once
-	// per individual dependency update), so a single regen handles the
-	// whole batch.
+	// 1. `install-tool node 20.14.0` — installs a Rush-compatible Node
+	//    version via containerbase. Renovate's `installTools` declarative
+	//    config (Renovate 41+) doesn't honor a node version constraint
+	//    (per renovatebot/renovate#26387 — `constraints.node` and
+	//    `force.constraints.node` are both ignored by installTools); the
+	//    maintainer's recommended pattern is to invoke `install-tool
+	//    node X.Y.Z` directly. Without this, containerbase defaults to
+	//    latest Node (24.x), which Rush rejects since rush.json's
+	//    `nodeSupportedVersionRange` allows only Node 18 or 20.
 	//
-	// `fileFilters` is the allowlist of files Renovate will include in the
-	// commit from post-task changes. The transient build state in
-	// `common/temp/` is gitignored by Rush convention, so it doesn't need
-	// explicit exclusion.
+	// 2. `install-tool npm` — materializes the npm CLI. Renovate's
+	//    Docker image ships Node but not the npm CLI by default
+	//    (Renovate's own npm manager uses pnpm internally and never
+	//    shells out to npm). Rush's bootstrap script does `command -v
+	//    npm` and aborts immediately if it can't find npm. `npm`
+	//    requires `node` to be containerbase-installed first, which
+	//    step 1 above provides.
+	//
+	// 3. `node common/scripts/install-run-rush.js update --bypass-policy`
+	//    — the Rush bootstrap. Downloads the pinned Rush version, then
+	//    runs `rush update` to regenerate
+	//    `common/config/rush/pnpm-lock.yaml` from current package.json
+	//    contents.
+	//
+	//    The `--bypass-policy` flag skips Rush's git-author email check
+	//    (`gitPolicy.allowedEmailRegExps` in rush.json). The first Rush
+	//    invocation in a run validates policy before Renovate sets its
+	//    bot identity, so the email check sees an unexpected value and
+	//    aborts. Without --bypass-policy, the very first branch
+	//    alphabetically processed will fail with: "Aborting, so you can
+	//    go fix your settings. (Or use '--bypass-policy' to skip.)"
 	//
 	// The matching `RENOVATE_ALLOWED_COMMANDS` regex allowlist in
 	// `.github/workflows/renovate.yml` is required — by default Renovate
 	// refuses to execute any postUpgradeTask command.
-	postUpgradeTasks: {
-		// Three commands, run in sequence in the same shell environment:
-		//
-		// 1. `install-tool node 20.14.0` — installs a Rush-compatible Node
-		//    version via containerbase. The Renovate `installTools`
-		//    declarative config (Renovate 41+) doesn't honor a node version
-		//    constraint (verified via Renovate discussion #26387 —
-		//    `constraints.node` and `force.constraints.node` are both
-		//    ignored by installTools); the maintainer's recommended pattern
-		//    is to invoke `install-tool node X.Y.Z` directly. Without this,
-		//    containerbase defaults to latest Node (24.x), which Rush
-		//    rejects (rush.json's `nodeSupportedVersionRange` allows only
-		//    Node 18 or 20). 20.14.0 is the bottom of the supported 20.x
-		//    range — bump as needed if rush.json changes.
-		//
-		// 2. `install-tool npm` — materializes the npm CLI. Renovate's
-		//    Docker image ships Node but not the npm CLI by default
-		//    (Renovate's own npm manager uses pnpm internally and never
-		//    shells out to npm). Rush's bootstrap script does `command -v
-		//    npm` and aborts immediately if it can't find npm. `npm`
-		//    requires `node` to be containerbase-installed first, which
-		//    step 1 above provides.
-		//
-		// 3. `node common/scripts/install-run-rush.js update --bypass-policy`
-		//    — the Rush bootstrap. Downloads the pinned Rush version, then
-		//    runs `rush update` to regenerate
-		//    `common/config/rush/pnpm-lock.yaml` from current package.json
-		//    contents.
-		//
-		//    The `--bypass-policy` flag skips Rush's git-author email check
-		//    (`gitPolicy.allowedEmailRegExps` in rush.json). That policy
-		//    exists to catch humans with unprofessional commit emails, but
-		//    bot tools doing automated lockfile maintenance can hit
-		//    false-positives — the first Rush invocation in a run does
-		//    policy validation before Renovate sets its bot identity, so
-		//    the email check sees an unexpected value and aborts. Without
-		//    --bypass-policy, the very first branch alphabetically
-		//    processed will fail with: "Aborting, so you can go fix your
-		//    settings. (Or use '--bypass-policy' to skip.)"
-		commands: [
-			'install-tool node 20.14.0',
-			'install-tool npm',
-			'node common/scripts/install-run-rush.js update --bypass-policy',
-		],
-		fileFilters: ['common/config/rush/pnpm-lock.yaml', 'common/config/rush/repo-state.json'],
-		executionMode: 'branch',
-	},
 }
