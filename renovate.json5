@@ -10,6 +10,12 @@
 
 	rangeStrategy: 'bump',
 	rebaseWhen: 'conflicted',
+	// Sandbox-only: always recreate PRs we've previously closed. Production
+	// configs should leave this at the default 'auto', which respects user
+	// intent (closing a Renovate PR signals "rejected, don't recreate"). Here
+	// we want fast iteration, so closing-and-re-triggering should always
+	// produce a fresh PR.
+	recreateWhen: 'always',
 	prHourlyLimit: 4,
 	prConcurrentLimit: 5,
 	labels: ['dependencies'],
