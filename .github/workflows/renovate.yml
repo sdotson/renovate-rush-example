@@ -65,6 +65,16 @@ jobs:
         uses: renovatebot/github-action@v41.0.0
         env:
           LOG_LEVEL: ${{ inputs.logLevel || 'debug' }}
+          # Tells Renovate to materialize tools on demand from containerbase
+          # (which the renovatebot/renovate Docker image is built on) rather
+          # than expecting them pre-installed in PATH. Required for Rush's
+          # `install-run-rush.js` bootstrap because that script does a
+          # `command -v npm` check at startup — and Renovate's container has
+          # Node but doesn't materialize the npm CLI binary until something
+          # asks for it. Without this set, postUpgradeTasks fails with:
+          #   Error: Unable to determine the path to the NPM tool:
+          #   Error: Command failed: command -v npm
+          RENOVATE_BINARY_SOURCE: 'install'
           # `renovatebot/github-action` only forwards `RENOVATE_*`-prefixed env
           # vars (plus LOG_LEVEL) into Renovate's Docker container — a bare
           # GITHUB_REPOSITORY would never reach it. Use ${{ github.repository }}
