@@ -62,7 +62,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Run Renovate
-        uses: renovatebot/github-action@v41.0.0
+        uses: renovatebot/github-action@v41.0.22
         env:
           LOG_LEVEL: ${{ inputs.logLevel || 'debug' }}
           # `renovatebot/github-action` only forwards `RENOVATE_*`-prefixed env
