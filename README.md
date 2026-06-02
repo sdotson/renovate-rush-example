@@ -27,7 +27,7 @@ postUpgradeTasks: {
   commands: [
     'install-tool node 20.14.0',
     'install-tool npm',
-    'node common/scripts/install-run-rush.js update',
+    'node common/scripts/install-run-rush.js update --bypass-policy',
   ],
   fileFilters: ['common/config/rush/pnpm-lock.yaml', 'common/config/rush/repo-state.json'],
   executionMode: 'branch',
@@ -42,10 +42,12 @@ The Renovate container is built on [containerbase](https://github.com/containerb
 
 The three commands run sequentially in the same shell, so step 2's npm is in PATH for step 3.
 
+`--bypass-policy` skips Rush's `gitPolicy.allowedEmailRegExps` check. That check exists to catch humans with unprofessional commit emails, but the first Rush invocation in a Renovate run runs *before* Renovate sets its bot identity, so the email check sees an unexpected value and aborts the first branch alphabetically. `--bypass-policy` is what Rush's own error message recommends for automation. Without it, you'll see the first branch's PR open with status check `renovate/artifacts` in FAILURE state.
+
 ### 2. `RENOVATE_ALLOWED_COMMANDS` permits exactly those commands
 
 ```yaml
-RENOVATE_ALLOWED_COMMANDS: '["^install-tool node [0-9.]+$", "^install-tool npm$", "^node common/scripts/install-run-rush\.js update$"]'
+RENOVATE_ALLOWED_COMMANDS: '["^install-tool node [0-9.]+$", "^install-tool npm$", "^node common/scripts/install-run-rush\.js update --bypass-policy$"]'
 ```
 
 Renovate refuses to run *any* postUpgradeTask command unless it matches this regex allowlist — by design, prevents an arbitrary repo config from executing arbitrary commands on the Renovate host. The three regexes match exactly the three commands above and nothing else.
