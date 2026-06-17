@@ -57,8 +57,24 @@
 					'install-tool node 20.14.0',
 					'install-tool npm',
 					'node common/scripts/install-run-rush.js update --bypass-policy',
+					// Regenerate every autoinstaller's OWN pnpm-lock.yaml. The
+					// `rush update` above only touches the consolidated workspace
+					// lockfile and is blind to the independent mini-projects under
+					// common/autoinstallers/. Renovate's npm manager bumps those
+					// package.json files all the same, so without this their
+					// lockfiles go stale and the tool the autoinstaller hosts
+					// breaks. See the script header for the full rationale.
+					// (No --bypass-policy here: update-autoinstaller does not run
+					// Rush's gitPolicy email check, and the flag does not exist.)
+					'node common/scripts/update-autoinstaller-lockfiles.mjs',
 				],
-				fileFilters: ['common/config/rush/pnpm-lock.yaml', 'common/config/rush/repo-state.json'],
+				fileFilters: [
+					'common/config/rush/pnpm-lock.yaml',
+					'common/config/rush/repo-state.json',
+					// So Renovate stages any autoinstaller lockfile the script
+					// regenerated into the branch commit.
+					'common/autoinstallers/**/pnpm-lock.yaml',
+				],
 				executionMode: 'branch',
 			},
 		},

@@ -90,9 +90,14 @@ jobs:
           #   1. install-tool node <version> — containerbase node install
           #   2. install-tool npm — containerbase npm install
           #   3. node common/scripts/install-run-rush.js update — Rush
+          #   4. node common/scripts/update-autoinstaller-lockfiles.mjs —
+          #      regenerates each autoinstaller's own pnpm-lock.yaml (the
+          #      script shells out to rush update-autoinstaller internally;
+          #      that nested call is NOT a Renovate command, so only the
+          #      top-level script invocation needs to be allowlisted here).
           # (This option was formerly named `allowedPostUpgradeCommands`;
           # renamed to `allowedCommands` in Renovate 39.131.0.)
-          RENOVATE_ALLOWED_COMMANDS: '["^install-tool node [0-9.]+$", "^install-tool npm$", "^node common/scripts/install-run-rush\\.js update --bypass-policy$"]'
+          RENOVATE_ALLOWED_COMMANDS: '["^install-tool node [0-9.]+$", "^install-tool npm$", "^node common/scripts/install-run-rush\\.js update --bypass-policy$", "^node common/scripts/update-autoinstaller-lockfiles\\.mjs$"]'
         with:
           configurationFile: renovate.json5
           token: ${{ steps.app-token.outputs.token }}
